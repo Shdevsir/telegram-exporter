@@ -1,9 +1,8 @@
 import asyncio
 
-from src.client.telegram_client import telegram_client
-from src.cli.terminal import terminal
 from rich.prompt import IntPrompt
-import time
+from src.cli.terminal import terminal
+from src.client.telegram_client import telegram_client
 
 
 async def setup():
@@ -16,6 +15,7 @@ async def setup():
     else:
         terminal.error(f"Telegram client setup failed: {message}")
         terminal.cleanup()
+
 
 async def choicer(ask_number: int):
     if ask_number == 1:
@@ -30,39 +30,40 @@ async def choicer(ask_number: int):
             total_messages = await telegram_client.get_messages_count(target_chat)
             with terminal.get_progress_bar() as progress:
                 task = progress.add_task("Analyzing messages...", total=total_messages)
+
                 async def update_progress(current, total):
                     progress.update(task, completed=current, total=total)
-                
+
                 stats, duration = await telegram_client.get_chat_statistics(
                     target_chat, total_messages, update_progress
                 )
-            
+
             terminal.show_statistics(target_chat.name, stats, duration)
         else:
             terminal.error("Invalid chat number.")
-        
+
     elif ask_number == 3:
         dialogs = await telegram_client.get_list_dialogs()
         terminal.show_dialogs(dialogs)
-        
+
         chat_idx = IntPrompt.ask("Choose the № of the chat you want to export")
-        
+
         if 0 <= chat_idx < len(dialogs):
             target_chat = dialogs[chat_idx]
-            
+
             paths = terminal.prepare_export_path(target_chat.name, target_chat.id)
             terminal.info(f"📁 Folders created in: {paths['base']}")
-            
+
             total_to_export = await telegram_client.get_messages_count(target_chat)
-            
+
             with terminal.get_progress_bar() as progress:
                 task = progress.add_task("[bold cyan]Downloading data...", total=total_to_export)
-                
+
                 async def update_progress(current, total):
                     progress.update(task, completed=current, total=total)
-                
+
                 count = await telegram_client.export_chat(target_chat, paths, update_progress)
-            
+
             terminal.success(f"✅ Export completed! Processed {count} messages.")
             terminal.info(f"Text history: {paths['text']}/history.json")
     elif ask_number == 4:
@@ -79,7 +80,7 @@ async def choicer(ask_number: int):
         pass
     else:
         terminal.error("Invalid choice. Please enter a number between 1 and 9.")
-    
+
 
 async def main():
     await setup()
@@ -90,11 +91,7 @@ async def main():
         await choicer(ask)
     terminal.clear()
     terminal.success("Exiting the application. Goodbye!")
-    
-
 
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-

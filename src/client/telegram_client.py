@@ -1,13 +1,20 @@
-from telethon import TelegramClient as tg_client
-from src.config.credentials import credentials
-from rich.prompt import Prompt
-from telethon.errors import SessionPasswordNeededError
-from telethon.errors.rpcerrorlist import ApiIdInvalidError, PhoneNumberInvalidError, PhoneCodeInvalidError, PhoneCodeEmptyError, SendCodeUnavailableError
-import time
-from telethon.tl.types import MessageEntityUrl, MessageEntityTextUrl
 import json
 import os
+import time
+
+from rich.prompt import Prompt
+from telethon import TelegramClient as tg_client
+from telethon.errors import SessionPasswordNeededError
+from telethon.errors.rpcerrorlist import ApiIdInvalidError
+from telethon.errors.rpcerrorlist import PhoneCodeEmptyError
+from telethon.errors.rpcerrorlist import PhoneCodeInvalidError
+from telethon.errors.rpcerrorlist import PhoneNumberInvalidError
+from telethon.errors.rpcerrorlist import SendCodeUnavailableError
+from telethon.tl.types import MessageEntityTextUrl
+from telethon.tl.types import MessageEntityUrl
 from telethon.tl.types import MessageMediaWebPage
+
+from src.config.credentials import credentials
 
 
 class TelegramClient:
@@ -16,7 +23,7 @@ class TelegramClient:
 
     async def setup(self) -> tuple[bool, str]:
         """
-        This method connects to the Telegram client and handles the authentication process. 
+        This method connects to the Telegram client and handles the authentication process.
         If the user is not authorized, it sends a code request to the user's phone number and prompts them to enter
         the code. If two-step verification is enabled, it also prompts for the password.
         """
@@ -52,13 +59,13 @@ class TelegramClient:
     async def info(self) -> str:
         me = await self.client.get_me()
         return me
-    
+
     async def get_messages_count(self, chat):
         count = await self.client.get_messages(chat, limit=1)
         if count.total == 2147483647:
             return None
         return count.total
-    
+
     async def get_chat_statistics(self, chat, total_count, progress_callback):
         stats = {
             "Total Messages": [0, 0],
@@ -74,23 +81,23 @@ class TelegramClient:
             "Stickers": [0, 0],
             "GIFs": [0, 0],
         }
-        
+
         start_time = time.perf_counter()
-        
+
         async for message in self.client.iter_messages(chat):
             stats["Total Messages"][0] += 1
-            
-            msg_text_size = len(message.text.encode('utf-8')) if message.text else 0
+
+            msg_text_size = len(message.text.encode("utf-8")) if message.text else 0
             stats["Total Messages"][1] += msg_text_size
-            
+
             if message.text:
                 stats["Text/Captions"][0] += 1
                 stats["Text/Captions"][1] += msg_text_size
-            
+
             if message.media:
                 file_size = message.file.size if message.file else 0
                 stats["Total Messages"][1] += file_size
-                
+
                 if message.sticker:
                     stats["Stickers"][0] += 1
                     stats["Stickers"][1] += file_size
@@ -115,7 +122,7 @@ class TelegramClient:
                 elif message.document:
                     stats["Files/Docs"][0] += 1
                     stats["Files/Docs"][1] += file_size
-            
+
             elif not message.text:
                 stats["Service Messages"][0] += 1
 
@@ -123,12 +130,14 @@ class TelegramClient:
                 if any(isinstance(e, (MessageEntityUrl, MessageEntityTextUrl)) for e in message.entities):
                     stats["Links"][0] += 1
 
-            if progress_callback and (stats["Total Messages"][0] % 50 == 0 or stats["Total Messages"][0] == total_count):
+            if progress_callback and (
+                stats["Total Messages"][0] % 50 == 0 or stats["Total Messages"][0] == total_count
+            ):
                 await progress_callback(stats["Total Messages"][0], total_count)
 
         end_time = time.perf_counter()
         duration = end_time - start_time
-        
+
         return stats, duration
 
     async def disconnect(self):
@@ -137,29 +146,28 @@ class TelegramClient:
     async def export_chat(self, chat, paths, progress_callback):
         exported_count = 0
         total_messages = (await self.client.get_messages(chat, limit=0)).total
-        
 
         history_file = os.path.join(paths["text"], "history.json")
         history_data = []
 
         async for message in self.client.iter_messages(chat):
             exported_count += 1
-            
+
             msg_entry = {
                 "id": message.id,
                 "date": str(message.date),
                 "text": message.text or "",
                 "sender_id": message.sender_id,
-                "media": None
+                "media": None,
             }
 
             if message.media and not isinstance(message.media, MessageMediaWebPage):
                 target_folder = self._get_target_folder(message, paths)
-                
+
                 # Create a unique file prefix based on message ID to avoid collisions
                 if target_folder:
                     file_prefix = f"{message.id}_"
-                    
+
                     # Check if a file with the same prefix already exists in the target folder
                     existing_files = os.listdir(target_folder)
                     already_downloaded = any(f.startswith(file_prefix) for f in existing_files)
@@ -179,7 +187,7 @@ class TelegramClient:
             if progress_callback and (exported_count % 5 == 0 or exported_count == total_messages):
                 await progress_callback(exported_count, total_messages)
 
-        with open(history_file, 'w', encoding='utf-8') as f:
+        with open(history_file, "w", encoding="utf-8") as f:
             json.dump(history_data, f, ensure_ascii=False, indent=4)
 
         return exported_count
@@ -199,8 +207,9 @@ class TelegramClient:
             return paths["audio"]
         if message.document:
             return paths["docs"]
-        
+
         return None
+
 
 telegram_client = TelegramClient()
 
