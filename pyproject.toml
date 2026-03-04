@@ -1,3 +1,16 @@
+[project]
+name = "telegram-exporter"
+version = "0.1.0"
+description = "A professional tool for exporting and analyzing Telegram chats"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "telethon==1.42.0",
+    "python-dotenv==1.2.1",
+    "rich==14.1.0",
+    "pre-commit==4.5.1",
+]
+
 [tool.ruff]
 src = ["src"]
 fix = true
