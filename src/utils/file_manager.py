@@ -36,6 +36,7 @@ class FileManager:
             "docs": os.path.join(base_path, "Files", "Documents"),
             "stickers": os.path.join(base_path, "Files", "Stickers"),
             "gifs": os.path.join(base_path, "Files", "GIFs"),
+            "info": os.path.join(base_path, "Info"),
         }
 
         for p in paths.values():

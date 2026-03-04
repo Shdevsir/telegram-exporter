@@ -11,7 +11,8 @@ from telethon.tl.custom import Dialog
 
 from src.config.credentials import credentials
 from src.config.env_generator import env_generator
-from src.utils.file_manager import FileManager
+from src.log.logger import app_logger
+from src.schemas.stats import ChatStats
 
 
 class Terminal:
@@ -130,24 +131,27 @@ class Terminal:
             else:
                 break
 
-    def show_statistics(self, chat_name: str, stats: dict, duration: float) -> None:
+    def show_statistics(self, chat_name: str, stats: ChatStats, duration: float) -> None:
         """
         Displays the collected statistics for a chat in a formatted table, including total messages, text/captions,
         media types, and the time taken for analysis.
         """
+        app_logger.debug(
+            f"Displaying statistics for chat: {chat_name} with stats: {stats} and duration: {duration:.2f} seconds"
+        )
         self.clear()
         table = Table(title=f"Statistics for: {chat_name}", title_style="bold magenta", show_footer=True)
         table.add_column("Category", style="cyan")
         table.add_column("Count", style="green")
-        table.add_column("Size (MB/GB)", style="green", footer=FileManager.format_size(stats["Total Messages"][1]))
+        table.add_column("Size (MB/GB)", style="green", footer=stats.total.formatted_size)
 
-        for key, value in stats.items():
-            if key == "Total Messages":
+        for key, (count, size) in stats.to_dict().items():
+            if key != "Total Messages":  # Skip total messages since it's already in the footer
                 continue
-            table.add_row(key, str(value[0]), FileManager.format_size(value[1]))
+            table.add_row(key, str(count), size)
 
         self.console.print(table)
-        self.success(f"\n✅ Analysis completed in {duration:.2f} seconds.")
+        self.success(f"\n✅ Analysis {stats.total.count} messages completed in {duration:.2f} seconds.")
 
     def get_progress_bar(self) -> Progress:
         """Creates and returns a rich Progress object configured."""
