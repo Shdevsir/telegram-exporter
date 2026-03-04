@@ -1,6 +1,8 @@
 import json
 import os
 import time
+from collections.abc import Awaitable
+from collections.abc import Callable
 
 from rich.prompt import Prompt
 from telethon import TelegramClient as tg_client
@@ -10,16 +12,24 @@ from telethon.errors.rpcerrorlist import PhoneCodeEmptyError
 from telethon.errors.rpcerrorlist import PhoneCodeInvalidError
 from telethon.errors.rpcerrorlist import PhoneNumberInvalidError
 from telethon.errors.rpcerrorlist import SendCodeUnavailableError
+from telethon.tl.custom import Dialog
+from telethon.tl.custom import Message
+from telethon.tl.types import Channel
+from telethon.tl.types import Chat
 from telethon.tl.types import MessageEntityTextUrl
 from telethon.tl.types import MessageEntityUrl
 from telethon.tl.types import MessageMediaWebPage
+from telethon.tl.types import User
 
 from src.config.credentials import credentials
+from src.log.logger import app_logger
+
+ProgressCallbackType = Callable[[int, int | None], Awaitable[None]]
 
 
 class TelegramClient:
     def __init__(self) -> None:
-        self.client = None
+        self.client: tg_client = None
 
     async def setup(self) -> tuple[bool, str]:
         """
@@ -52,21 +62,72 @@ class TelegramClient:
             await self.client.sign_in(password=password)
         return True, "Telegram client setup successfully!"
 
-    async def get_list_dialogs(self) -> list:
-        dialogs = await self.client.get_dialogs()
+    async def get_list_dialogs(self) -> list[Dialog]:
+        """Fetches the list of dialogs (chats) from the Telegram client."""
+        dialogs: list[Dialog] = await self.client.get_dialogs()
         return dialogs
 
-    async def info(self) -> str:
+    async def info(self) -> User:
+        """Retrieves information about the currently logged-in user."""
         me = await self.client.get_me()
         return me
 
-    async def get_messages_count(self, chat):
+    async def get_messages_count(self, chat: User | Chat | Channel) -> int | None:
         count = await self.client.get_messages(chat, limit=1)
-        if count.total == 2147483647:
+        app_logger.debug(count)
+        if count.total >= 2147483647:
+            app_logger.debug("Enter")
+            if hasattr(chat, "message") and hasattr(chat.message, "id"):
+                app_logger.debug(chat.message.id)
+                return int(chat.message.id)
+            app_logger.debug("Exit")
             return None
-        return count.total
+        return int(count.total)
 
-    async def get_chat_statistics(self, chat, total_count, progress_callback):
+    def _calculate_stats(self, stats: dict[str, list[int]], message: Message) -> None:
+        stats["Total Messages"][0] += 1
+
+        msg_text_size = len(message.text.encode("utf-8")) if message.text else 0
+        stats["Total Messages"][1] += msg_text_size
+
+        if message.text:
+            stats["Text/Captions"][0] += 1
+            stats["Text/Captions"][1] += msg_text_size
+
+        if message.media:
+            file_size = message.file.size if message.file else 0
+            stats["Total Messages"][1] += file_size
+
+            media_map = {
+                "sticker": "Stickers",
+                "gif": "GIFs",
+                "photo": "Photos",
+                "video": "Videos",
+                "voice": "Voice Messages",
+                "video_note": "Video Notes (Rounds)",
+                "audio": "Audios",
+                "document": "Files/Docs",
+            }
+
+            for attr, stat_key in media_map.items():
+                if getattr(message, attr, None):
+                    stats[stat_key][0] += 1
+                    stats[stat_key][1] += file_size
+                    break
+
+        elif not message.text:
+            stats["Service Messages"][0] += 1
+
+        if message.entities:
+            if any(isinstance(e, (MessageEntityUrl, MessageEntityTextUrl)) for e in message.entities):
+                stats["Links"][0] += 1
+
+    async def get_chat_statistics(
+        self, chat: User | Chat | Channel, total_count: int | None, progress_callback: ProgressCallbackType | None
+    ) -> tuple[dict[str, list[int]], float]:
+        """
+        Analyzes the messages in a chat and collects various statistics such as total messages, text/captions,
+        media types, etc."""
         stats = {
             "Total Messages": [0, 0],
             "Text/Captions": [0, 0],
@@ -85,50 +146,7 @@ class TelegramClient:
         start_time = time.perf_counter()
 
         async for message in self.client.iter_messages(chat):
-            stats["Total Messages"][0] += 1
-
-            msg_text_size = len(message.text.encode("utf-8")) if message.text else 0
-            stats["Total Messages"][1] += msg_text_size
-
-            if message.text:
-                stats["Text/Captions"][0] += 1
-                stats["Text/Captions"][1] += msg_text_size
-
-            if message.media:
-                file_size = message.file.size if message.file else 0
-                stats["Total Messages"][1] += file_size
-
-                if message.sticker:
-                    stats["Stickers"][0] += 1
-                    stats["Stickers"][1] += file_size
-                elif message.gif:
-                    stats["GIFs"][0] += 1
-                    stats["GIFs"][1] += file_size
-                elif message.photo:
-                    stats["Photos"][0] += 1
-                    stats["Photos"][1] += file_size
-                elif message.video:
-                    stats["Videos"][0] += 1
-                    stats["Videos"][1] += file_size
-                elif message.voice:
-                    stats["Voice Messages"][0] += 1
-                    stats["Voice Messages"][1] += file_size
-                elif message.video_note:
-                    stats["Video Notes (Rounds)"][0] += 1
-                    stats["Video Notes (Rounds)"][1] += file_size
-                elif message.audio:
-                    stats["Audios"][0] += 1
-                    stats["Audios"][1] += file_size
-                elif message.document:
-                    stats["Files/Docs"][0] += 1
-                    stats["Files/Docs"][1] += file_size
-
-            elif not message.text:
-                stats["Service Messages"][0] += 1
-
-            if message.entities:
-                if any(isinstance(e, (MessageEntityUrl, MessageEntityTextUrl)) for e in message.entities):
-                    stats["Links"][0] += 1
+            self._calculate_stats(stats, message)
 
             if progress_callback and (
                 stats["Total Messages"][0] % 50 == 0 or stats["Total Messages"][0] == total_count
@@ -140,10 +158,16 @@ class TelegramClient:
 
         return stats, duration
 
-    async def disconnect(self):
+    async def disconnect(self) -> None:
+        """Disconnects the Telegram client session."""
         await self.client.disconnect()
 
-    async def export_chat(self, chat, paths, progress_callback):
+    async def export_chat(
+        self, chat: User | Chat | Channel, paths: dict, progress_callback: ProgressCallbackType | None
+    ) -> int:
+        """
+        Exports the messages from a chat, including downloading media files and saving message history in JSON format.
+        """
         exported_count = 0
         total_messages = (await self.client.get_messages(chat, limit=0)).total
 
@@ -176,7 +200,9 @@ class TelegramClient:
                         path_template = os.path.join(target_folder, file_prefix)
                         downloaded_path = await self.client.download_media(message, file=path_template)
                         msg_entry["media"] = downloaded_path
+                        app_logger.info(f"Successfully migrated media: ID {message.id} to {downloaded_path}")
                     else:
+                        app_logger.debug(f"Skipped media (already exists): ID {message.id}")
                         for f in existing_files:
                             if f.startswith(file_prefix):
                                 msg_entry["media"] = os.path.join(target_folder, f)
@@ -187,12 +213,13 @@ class TelegramClient:
             if progress_callback and (exported_count % 5 == 0 or exported_count == total_messages):
                 await progress_callback(exported_count, total_messages)
 
-        with open(history_file, "w", encoding="utf-8") as f:
-            json.dump(history_data, f, ensure_ascii=False, indent=4)
+        with open(history_file, "w", encoding="utf-8") as file:
+            json.dump(history_data, file, ensure_ascii=False, indent=4)
 
         return exported_count
 
-    def _get_target_folder(self, message, paths) -> str:
+    def _get_target_folder(self, message: Message, paths: dict[str, str]) -> str | None:
+        """Determines the appropriate folder for downloading media based on the message's media type."""
         if message.sticker:
             return paths["stickers"]
         if message.gif:

@@ -1,5 +1,6 @@
 telegram_data
 __pycache__
 session/
+logs
 venv/
 .env
