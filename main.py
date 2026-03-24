@@ -1,11 +1,15 @@
 import asyncio
+import multiprocessing
+import os
 import sys
 
 from rich.prompt import IntPrompt
-from src.cli.terminal import terminal
-from src.client.telegram_client import telegram_client
-from src.log.logger import app_logger
-from src.utils.file_manager import FileManager
+from rich.prompt import Prompt
+from src.cli import terminal
+from src.client import telegram_client
+from src.log import app_logger
+from src.utils import FileManager
+from src.web import run_server
 from telethon.tl.custom import Dialog
 
 
@@ -67,21 +71,36 @@ async def choicer(ask_number: int, dialogs: list[Dialog]) -> None:
 
             terminal.success(f"✅ Export completed! Processed {count} messages.")
             terminal.info(f"Text history: {paths['text']}/history.json")
+    elif ask_number == 4:
+        terminal.info("Starting web server at http://localhost:5000")
+        server_process = multiprocessing.Process(
+            target=run_server, kwargs={"host": "127.0.0.1", "port": 5000}, daemon=True
+        )
+        server_process.start()
+
+        terminal.console.print("\n[bold green]🚀 Web server started![/bold green]")
+        terminal.console.print("[cyan]Address: http://localhost:5000[/cyan]")
+        terminal.console.print("-" * 30)
+
+        Prompt.ask("[bold yellow]Press Enter to stop the server and return to the menu[/bold yellow]")
+
+        server_process.terminate()
+        server_process.join()
+
+        terminal.console.print("[bold red]❌ Web server stopped.[/bold red]\n")
+    elif ask_number == 5:
+        terminal.info("Exiting the application...")
     else:
-        terminal.error("Invalid choice. Please enter a number between 1 and 9.")
+        terminal.error("Invalid choice. Please enter a number between 1 and 5.")
 
 
 async def main() -> None:
     await setup()
     ask = 0
     dialogs = await telegram_client.get_list_dialogs()
-    while ask != 4:
+    while ask != 5:
         terminal.print_choices()
-        # try:
-        ask = IntPrompt.ask("Enter the number with action what you want to do", default=4)
-        # except EOFError:
-        #     terminal.error("No input detected. Exiting the application.")
-        #     break
+        ask = IntPrompt.ask("Enter the number with action what you want to do", default=5)
         await choicer(ask, dialogs)
     terminal.clear()
     terminal.success("Exiting the application. Goodbye!")
@@ -89,6 +108,7 @@ async def main() -> None:
 
 if __name__ == "__main__":
     try:
+        os.environ["LOGGER"] = "Create"
         asyncio.run(main())
     except (KeyboardInterrupt, EOFError):
         app_logger.warning("Application stopped by user interruption.")

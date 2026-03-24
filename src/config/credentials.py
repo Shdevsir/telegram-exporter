@@ -24,8 +24,3 @@ class Credentials:
             file_path = os.path.join("session", filename)
             if os.path.isfile(file_path):
                 os.remove(file_path)
-
-
-credentials = Credentials()
-
-__all__ = ["credentials"]

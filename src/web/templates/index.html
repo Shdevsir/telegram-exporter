@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Archive Gallery</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="app-bg">
+    <main class="shell">
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">Archive Browser</p>
+                <h1>Telegram Archive Gallery</h1>
+            </div>
+            <form class="controls" method="GET" action="/">
+                <label for="per_page">Chats per page</label>
+                <select name="per_page" id="per_page" onchange="this.form.submit()">
+                    <option value="12" {% if per_page==12 %}selected{% endif %}>12</option>
+                    <option value="24" {% if per_page==24 %}selected{% endif %}>24</option>
+                    <option value="48" {% if per_page==48 %}selected{% endif %}>48</option>
+                    <option value="96" {% if per_page==96 %}selected{% endif %}>96</option>
+                </select>
+                <input type="hidden" name="page" value="1">
+            </form>
+        </header>
+
+        <section class="meta-row">
+            <span class="pill">{{ total_chats }} archived chats</span>
+            <span class="pill">Page {{ current_page }} of {{ total_pages }}</span>
+        </section>
+
+        <section class="chat-grid">
+            {% for chat in chats %}
+            <a href="/chat/{{ chat.id }}?page=1&per_page=20" class="chat-card">
+                <div class="chat-avatar-wrap">
+                    <img src="/media/{{ chat.id }}/Info/avatar.jpg" alt="Avatar" class="avatar"
+                         onerror="this.src='https://ui-avatars.com/api/?name={{ chat.name }}&background=0f766e&color=fff'">
+                </div>
+                <div class="chat-body">
+                    <h3>{{ chat.name }}</h3>
+                    <p class="chat-meta">{{ chat.type }}</p>
+                    {% if chat.username %}
+                    <p class="chat-handle">@{{ chat.username }}</p>
+                    {% endif %}
+                    <p class="chat-id">{{ chat.id }}</p>
+                </div>
+            </a>
+            {% else %}
+            <div class="empty-card">
+                <h3>No exported chats found</h3>
+                <p>Place exported Telegram chat folders in the telegram_data directory.</p>
+            </div>
+            {% endfor %}
+        </section>
+
+        <nav class="pager">
+            {% if current_page > 1 %}
+            <a class="btn" href="/?page={{ current_page - 1 }}&per_page={{ per_page }}">Previous</a>
+            {% else %}
+            <span class="btn disabled">Previous</span>
+            {% endif %}
+
+            {% if current_page < total_pages %}
+            <a class="btn" href="/?page={{ current_page + 1 }}&per_page={{ per_page }}">Next</a>
+            {% else %}
+            <span class="btn disabled">Next</span>
+            {% endif %}
+        </nav>
+    </main>
+</body>
+</html>

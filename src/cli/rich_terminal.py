@@ -9,9 +9,9 @@ from rich.prompt import PromptBase
 from rich.table import Table
 from telethon.tl.custom import Dialog
 
-from src.config.credentials import credentials
-from src.config.env_generator import env_generator
-from src.log.logger import app_logger
+from src.config import credentials
+from src.config import env_generator
+from src.log import app_logger
 from src.schemas.stats import ChatStats
 
 
@@ -49,13 +49,11 @@ class Terminal:
             ("Session Name", "SESSION_NAME_TELEGRAM", "Session name is missing", Prompt),
         ]
         needs_reload = False
-
         for attr, env_name, error_msg, prompt_cls in fields:
             if not getattr(credentials, attr.lower().replace(" ", "_")):
-                self.error(f"{error_msg}. Please enter your {attr}:")
-
-                if attr == ("API ID", "API HASH"):
+                if attr == "API ID" or attr == "API Hash":
                     self.warning(f"You can generate {attr} at https://my.telegram.org/apps")
+                self.error(f"{error_msg}. Please enter your {attr}:")
                 value = prompt_cls.ask(attr)
                 env_generator.add_variable(env_name, value)
                 needs_reload = True
@@ -171,9 +169,5 @@ class Terminal:
         self.info("1. Show dialogs")
         self.info("2. Show chat statistics")
         self.info("3. Export chat")
-        self.info("4. Exit\n")
-
-
-terminal = Terminal()
-
-__all__ = ["terminal"]
+        self.info("4. Start web server for local viewing exported data\n")
+        self.info("5. Exit\n")

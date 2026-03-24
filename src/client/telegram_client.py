@@ -21,9 +21,9 @@ from telethon.tl.types import MessageEntityUrl
 from telethon.tl.types import MessageMediaWebPage
 from telethon.tl.types import User
 
-from src.config.credentials import credentials
-from src.log.logger import app_logger
-from src.schemas.stats import ChatStats
+from src.config import credentials
+from src.log import app_logger
+from src.schemas import ChatStats
 
 ProgressCallbackType = Callable[[int, int | None], Awaitable[None]]
 
@@ -263,8 +263,3 @@ class TelegramClient:
             else:
                 entity_type = "Supergroup (Large Group)"
         return entity_type
-
-
-telegram_client = TelegramClient()
-
-__all__ = ["telegram_client"]
