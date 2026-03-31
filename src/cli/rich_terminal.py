@@ -9,9 +9,10 @@ from rich.prompt import PromptBase
 from rich.table import Table
 from telethon.tl.custom import Dialog
 
-from src.config.credentials import credentials
-from src.config.env_generator import env_generator
-from src.utils.file_manager import FileManager
+from src.config import credentials
+from src.config import env_generator
+from src.log import app_logger
+from src.schemas.stats import ChatStats
 
 
 class Terminal:
@@ -48,13 +49,11 @@ class Terminal:
             ("Session Name", "SESSION_NAME_TELEGRAM", "Session name is missing", Prompt),
         ]
         needs_reload = False
-
         for attr, env_name, error_msg, prompt_cls in fields:
             if not getattr(credentials, attr.lower().replace(" ", "_")):
-                self.error(f"{error_msg}. Please enter your {attr}:")
-
-                if attr == ("API ID", "API HASH"):
+                if attr == "API ID" or attr == "API Hash":
                     self.warning(f"You can generate {attr} at https://my.telegram.org/apps")
+                self.error(f"{error_msg}. Please enter your {attr}:")
                 value = prompt_cls.ask(attr)
                 env_generator.add_variable(env_name, value)
                 needs_reload = True
@@ -130,24 +129,27 @@ class Terminal:
             else:
                 break
 
-    def show_statistics(self, chat_name: str, stats: dict, duration: float) -> None:
+    def show_statistics(self, chat_name: str, stats: ChatStats, duration: float) -> None:
         """
         Displays the collected statistics for a chat in a formatted table, including total messages, text/captions,
         media types, and the time taken for analysis.
         """
+        app_logger.debug(
+            f"Displaying statistics for chat: {chat_name} with stats: {stats} and duration: {duration:.2f} seconds"
+        )
         self.clear()
         table = Table(title=f"Statistics for: {chat_name}", title_style="bold magenta", show_footer=True)
         table.add_column("Category", style="cyan")
         table.add_column("Count", style="green")
-        table.add_column("Size (MB/GB)", style="green", footer=FileManager.format_size(stats["Total Messages"][1]))
+        table.add_column("Size (MB/GB)", style="green", footer=stats.total.formatted_size)
 
-        for key, value in stats.items():
-            if key == "Total Messages":
+        for key, (count, size) in stats.to_dict().items():
+            if key != "Total Messages":  # Skip total messages since it's already in the footer
                 continue
-            table.add_row(key, str(value[0]), FileManager.format_size(value[1]))
+            table.add_row(key, str(count), size)
 
         self.console.print(table)
-        self.success(f"\n✅ Analysis completed in {duration:.2f} seconds.")
+        self.success(f"\n✅ Analysis {stats.total.count} messages completed in {duration:.2f} seconds.")
 
     def get_progress_bar(self) -> Progress:
         """Creates and returns a rich Progress object configured."""
@@ -167,9 +169,5 @@ class Terminal:
         self.info("1. Show dialogs")
         self.info("2. Show chat statistics")
         self.info("3. Export chat")
-        self.info("4. Exit\n")
-
-
-terminal = Terminal()
-
-__all__ = ["terminal"]
+        self.info("4. Start web server for local viewing exported data\n")
+        self.info("5. Exit\n")

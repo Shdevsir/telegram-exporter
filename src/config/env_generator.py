@@ -14,8 +14,3 @@ class EnvGenerator:
         """Cleans up the .env file"""
         with open(".env", "w") as env_file:
             env_file.write("")
-
-
-env_generator = EnvGenerator()
-
-__all__ = ["env_generator"]

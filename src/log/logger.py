@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -7,6 +8,11 @@ class Logger:
     def __init__(self, name: str = "telegram_exporter") -> None:
         self.logger = logging.getLogger(name)
         self.logger.setLevel(logging.DEBUG)
+
+        if not os.environ.get("LOGGER"):
+            if not self.logger.handlers:
+                self.logger.addHandler(logging.NullHandler())
+            return
 
         log_dir = Path("logs")
         log_dir.mkdir(exist_ok=True)
@@ -36,8 +42,3 @@ class Logger:
 
     def debug(self, message: str) -> None:
         self.logger.debug(message)
-
-
-app_logger = Logger()
-
-__all__ = ["app_logger"]

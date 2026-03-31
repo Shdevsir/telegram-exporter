@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if info.about.title %}{{ info.about.title }}{% elif info.about.first_name %}{{ info.about.first_name }}{% else %}{{ chat_id }}{% endif %} | Archive</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="app-bg no-pad">
+    <div class="viewer-shell">
+        <aside class="chat-sidebar">
+            <a href="/" class="sidebar-home">All Chats</a>
+            <h2>Archived Chats</h2>
+            <div class="sidebar-list">
+                {% for entry in chat_menu %}
+                <a class="sidebar-item {% if entry.id == chat_id %}active{% endif %}" href="/chat/{{ entry.id }}?page=1&per_page={{ per_page }}">
+                    <span class="name">{{ entry.name }}</span>
+                    <span class="id">{{ entry.id }}</span>
+                </a>
+                {% endfor %}
+            </div>
+        </aside>
+
+        <main class="chat-main">
+            <header class="chat-topbar">
+                <div class="chat-heading">
+                    {% if avatar_exists %}
+                    <img src="/media/{{ chat_id }}/Info/avatar.jpg" class="avatar small" alt="Avatar">
+                    {% else %}
+                    <img src="https://ui-avatars.com/api/?name=Chat&background=0f766e&color=fff" class="avatar small" alt="Avatar">
+                    {% endif %}
+                    <div>
+                        <h1>{% if info.about.title %}{{ info.about.title }}{% elif info.about.first_name %}{% if info.about.last_name %}{{ info.about.first_name }} {{ info.about.last_name }}{% else %}{{ info.about.first_name }}{% endif %}{% elif chat %}{{ chat.name }}{% else %}{{ chat_id }}{% endif %}</h1>
+                        <p>{{ total_messages }} messages • Page {{ current_page }} of {{ total_pages }}</p>
+                    </div>
+                </div>
+
+                <form class="controls inline" method="GET" action="/chat/{{ chat_id }}">
+                    <label for="per_page">Per page</label>
+                    <select name="per_page" id="per_page" onchange="this.form.submit()">
+                        <option value="20" {% if per_page==20 %}selected{% endif %}>20</option>
+                        <option value="40" {% if per_page==40 %}selected{% endif %}>40</option>
+                        <option value="80" {% if per_page==80 %}selected{% endif %}>80</option>
+                    </select>
+                    <input type="hidden" name="page" value="1">
+                </form>
+            </header>
+
+            <section class="messages-container">
+                {% for msg in messages %}
+                <article class="message received" id="msg-{{ msg.id }}">
+                    {% if msg.media_url %}
+                    <div class="msg-media">
+                        {% if msg.media_kind == 'image' %}
+                        <a href="{{ msg.media_url }}" target="_blank" rel="noopener">
+                            <img src="{{ msg.media_url }}" alt="Image">
+                        </a>
+                        {% elif msg.media_kind == 'video' %}
+                        <video controls preload="metadata">
+                            <source src="{{ msg.media_url }}">
+                        </video>
+                        {% elif msg.media_kind == 'round' %}
+                        <video class="round-video" controls preload="metadata">
+                            <source src="{{ msg.media_url }}">
+                        </video>
+                        {% elif msg.media_kind == 'audio' %}
+                        <audio controls preload="metadata">
+                            <source src="{{ msg.media_url }}">
+                        </audio>
+                        {% elif msg.media_kind == 'gif' %}
+                        <video autoplay loop muted playsinline class="gif-player">
+                            <source src="{{ msg.media_url }}">
+                        </video>
+                        {% else %}
+                        <a href="{{ msg.media_url }}" target="_blank" rel="noopener" class="file-link">Download file</a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if msg.text %}
+                    <p class="msg-text">{{ msg.text }}</p>
+                    {% endif %}
+
+                    <footer class="msg-meta">
+                        <span>
+                            {% if msg.date %}
+                            {{ msg.date.split(' ')[0] }}{% if msg.time_text %} {{ msg.time_text }}{% endif %}
+                            {% endif %}
+                        </span>
+                    </footer>
+                </article>
+                {% else %}
+                <div class="empty-chat">No messages available on this page.</div>
+                {% endfor %}
+            </section>
+
+            <nav class="pager chat-pager">
+                {% if current_page > 1 %}
+                <a class="btn" href="/chat/{{ chat_id }}?page={{ current_page - 1 }}&per_page={{ per_page }}">Previous</a>
+                {% else %}
+                <span class="btn disabled">Previous</span>
+                {% endif %}
+
+                {% if current_page < total_pages %}
+                <a class="btn" href="/chat/{{ chat_id }}?page={{ current_page + 1 }}&per_page={{ per_page }}">Next</a>
+                {% else %}
+                <span class="btn disabled">Next</span>
+                {% endif %}
+            </nav>
+        </main>
+    </div>
+</body>
+</html>
